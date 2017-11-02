@@ -20,27 +20,33 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+prig_file="$(pwd)/$0"
+
 # print and die
 function die # (code, message...)
 {
   code=$1
   shift
-  echo 1>&2 "$@"
+  echo 1>&2 ${command_verb:-[core]}: "$@"
   exit $code
   exit 1
 }
 function diecv # (message...)
 {
-  die 1 $command_verb: "$@"
+  die 1 "$@"
 }
 
 function debug_log # (message...)
 {
-  (( $VERBOSE )) && echo ' DD ' "$@"
+  (( $VERBOSE )) && echo ' DD ' ${command_verb:-[core]}: "$@"
 }
-function debug_logcv # (message...)
+function log_cmd # (cmd, args...)
 {
-  debug_log $command_verb: "$@"
+  debug_log executing: "$@"
+  {
+    echo -e '\n------------------------------------------------------------------------------\n'"$@":'\n'
+    "$@"
+  } 1>>"$gbl_opt_log" 2>&1
 }
 
 
@@ -68,15 +74,15 @@ cmdcheck declare
 cmdcheck compgen
 
 # check for required commands
+cmdcheck cat
+cmdcheck cut
 cmdcheck grep
-cmdcheck tr
 cmdcheck git
 
 # check for alternatives (curl / wget, ...)
 has wget && has_wget=true || has_wget=false
 has wget && has_curl=true || has_curl=false
 debug_log "has wget: ${has_wget}, has curl: ${has_curl}"
-
 
 
 
@@ -88,20 +94,45 @@ debug_log "has wget: ${has_wget}, has curl: ${has_curl}"
 gbl_opt_skip_unknown=false
 help_gbl_opt_skip_unknown="Do not generate an error when a flag is not recognized"
 
+gbl_opt_log="./prig.log"
+help_gbl_opt_log="The log file where output of commands are written"
+
 gbl_opt_force_curl=false
 help_gbl_opt_force_curl="Force the usage of curl when both wget and curl are available"
 
 gbl_opt_prig_command_dir="./scripts/prig/"
 help_gbl_opt_prig_command_dir="Indicate the folder that hold the external prig commands"
 
+gbl_opt_prig_repo="https://github.com/tim42/prig.git"
+help_gbl_opt_prig_repo="The git repository of prig. Prig and its commands will be checked out from there."
+
+
 # command option definition
+cmd_opt_init_force=false
+help_cmd_opt_init_force="Force initialization, even if prig is already present. (this won't remove the old prig installation if paths are different)."
+noconf_cmd_opt_init_force=
+
+cmd_opt_init_git_template=
+help_cmd_opt_init_git_template="The git template directory, as specified by git init --template=... ."
+noconf_cmd_opt_init_git_templatee=
 
 
-# misc var definition
+# conf var definition (prefixed by conf_)
+conf_project_name=
+help_conf_project_name="The project name"
+
+# load options for external commands
+[ -f ./.prigrc ] && { debug_log 'loading config file...' ; log_cmd . ./.prigrc ; }
+ext_command_options="$(compgen -A file "$gbl_opt_prig_command_dir/cmd/cmd_opt_")"
+for cmd_opt in $ext_command_options
+do
+  log_cmd . "$cmd_opt"
+done
+
 
 
 # load the prig.conf file
-[ -f ./prig.conf ] && { debug_log 'loading config file...' ; . prig.conf ; }
+[ -f ./.prigrc ] && { debug_log 'loading config file...' ; log_cmd . ./.prigrc ; }
 
 
 
@@ -110,12 +141,10 @@ help_gbl_opt_prig_command_dir="Indicate the folder that hold the external prig c
 ##
 
 
-
 function var_exists # (var-name)
 {
   typeset -p $1 &>/dev/null
 }
-
 
 
 ##
@@ -124,21 +153,131 @@ function var_exists # (var-name)
 
 
 
-cmd_opt_init_toto=
-help_cmd_opt_init_toto="do stuff"
-
 help_prig_cmd_init="Initialize prig in the current directory or the specified directory"
 usage_prig_cmd_init="project-name [opt-project-directory]"
 function prig_cmd_init # (project-name, project-directory='./')
 {
   (( $# == 0 )) && diecv "missing project name. See help for more information."
-  project_name="$1"
+  conf_project_name="$1"
   (( $# == 2 )) && project_directory="$2" || project_directory="."
 
-  debug_logcv "project-name: '$project_name'"
-  debug_logcv "project-dir:  '$project_directory'"
+  debug_log "project-name: '$conf_project_name'"
+  debug_log "project-dir:  '$project_directory'"
 
-  # TODO: finish that
+  pushd "$project_directory" 1>/dev/null
+
+  # .prigrc generation
+  if [ ! -f "./.prigrc" ] || [ "$cmd_opt_init_force" = "true" ]
+  then
+    echo "generating a '.prigrc' file..."
+    log_cmd rm -f "./.prigrc"
+
+    echo -n >"./.prigrc"
+    cat <<EOF >>"./.prigrc"
+##
+## prig configuration file
+##  generated on $(has date && date || echo -n '[unknown]')
+##
+
+##
+## PRIG CONF VARS
+##
+
+EOF
+    var_list="$(compgen -A variable "conf_")"
+    for var in $var_list
+    do
+      help_var="help_$var"
+      echo "# ${!help_var}" >>"./.prigrc"
+      echo "$var='${!var}'" >>"./.prigrc"
+      echo >>"./.prigrc"
+    done
+
+    cat <<EOF >>"./.prigrc"
+
+##
+## PRIG GLOBAL OPTIONS
+##
+
+EOF
+
+    var_list="$(compgen -A variable "gbl_opt_")"
+    for var in $var_list
+    do
+      var_exists "noconf_$var" && continue
+
+      help_var="help_$var"
+      echo "# ${!help_var}" >>"./.prigrc"
+      echo "$var='${!var}'" >>"./.prigrc"
+      echo >>"./.prigrc"
+    done
+
+    cat <<EOF >>"./.prigrc"
+
+##
+## PRIG COMMAND OPTIONS
+##
+
+EOF
+    var_list="$(compgen -A variable "cmd_opt_")"
+    for var in $var_list
+    do
+      var_exists "noconf_$var" && continue
+
+      help_var="help_$var"
+      echo "# ${!help_var}" >>"./.prigrc"
+      echo "$var='${!var}'" >>"./.prigrc"
+      echo >>"./.prigrc"
+    done
+  fi
+
+  # check that the current directory is a git repo, else create one
+  if [ ! -d .git ] || ! git rev-parse --git-dir &>/dev/null || [ "$cmd_opt_init_force" = "true" ]
+  then
+    debug_log "generating a git repo..."
+    if [ ! -z "$cmd_opt_init_git_template" ]
+    then
+      log_cmd git init --template="$cmd_opt_init_git_template" .
+    else
+      log_cmd git init .
+    fi
+  else
+    # save the state of the repository
+    log_cmd git stash save -a 'pre-prig-init-'$(date +%s)
+
+    # check if a prig submodule doesn't already exists
+    prig_repos="$(git submodule foreach 'echo -n "$path#" 1>&2 ; git remote get-url origin 1>&2' 2>&1 1>/dev/null  | grep "$gbl_opt_prig_repo")"
+
+    if [ ! -z "$prig_repos" ]
+    then
+      # remove those repositories
+      while read -r repo
+      do
+        path="$(cut -d'#' -f1 <<<"$repo")"
+        echo "removing submodule in '$path'..."
+
+        log_cmd git rm --force "$path"
+      done <<<"$prig_repos"
+      log_cmd git commit -am "[prig]: remove old prig submodules" &>/dev/null
+    fi
+  fi
+
+  echo "adding prig as a submodule in '$gbl_opt_prig_command_dir'..."
+  log_cmd rm -rf "$gbl_opt_prig_command_dir"
+  log_cmd rm -rf "$(git rev-parse --git-dir)/modules/prig-submodule/"
+  log_cmd git submodule add --name "prig-submodule" -- "$gbl_opt_prig_repo" "$gbl_opt_prig_command_dir"
+
+  # copy prig in the project root folder
+  debug_log "checking for a 'prig' file..."
+  [ -f "./prig" ] && cmp "./prig" "$gbl_opt_prig_command_dir/prig" &>/dev/null || log_cmd cp -v "$gbl_opt_prig_command_dir/prig" .
+
+  log_cmd git add .prigrc prig
+  log_cmd git commit -am "[prig]: add prig" &>/dev/null
+
+  echo "(re) generating the project with a './prig apply'..."
+
+  # give hand to the newly installed prig
+  exec ./prig apply
 }
 
 # the help command
@@ -161,23 +300,22 @@ function prig_cmd_help # (command_verb?)
     done
 
     # external commands
-    ext_commands="$(compgen -A file "$gbl_opt_prig_command_dir/cmd_opt_")"
+    ext_commands="$(compgen -A file "$gbl_opt_prig_command_dir/cmd/cmd_opt_")"
     for cmd in $ext_commands
     do
       echo '-------------------------------------------------------------------------------'
       file="$cmd"
       cmd="${cmd##*/}"
       cmd="${cmd:8}"
-      debug_logcv "loading option file '$file' for command '$cmd'..."
-      ( . $file; cmd_help_print_options "$cmd" )
+      cmd_help_print_options "$cmd"
     done
   else
     # list just one
     if ! has prig_cmd_"$1"
     then
       # try to load it
-      cmd_opt_path="$gbl_opt_prig_command_dir/cmd_opt_$1"
-      debug_logcv "$1 is not an internal command: trying to load its options from $cmd_opt_path"
+      cmd_opt_path="$gbl_opt_prig_command_dir/cmd/cmd_opt_$1"
+      debug_log "$1 is not an internal command: trying to load its options from $cmd_opt_path"
       [ -e "$cmd_opt_path" ] && . "$cmd_opt_path" || diecv "Unable to find command '$1'"
     fi
 
@@ -222,7 +360,10 @@ function cmd_help_print_options # (command_verb)
     # loop over variables
     for var in $help_var_list
     do
-      optname="$(tr _ - <<<"${var:8}")"
+      optname="${var:8}"
+      optname="${optname//_/-}"
+      optname="${optname:${#1}}"
+      optname="${optname:1}"
       echo -n "  --${optname} (current value: '${!var}' )"
       help_var="help_$var"
       var_exists "$help_var" && echo -e ":\n    ${!help_var}" || echo
@@ -264,7 +405,8 @@ function gbl_opt_help # ()
   help_var_list="${!gbl_opt_@}"
   for var in $help_var_list
   do
-    optname="$(tr _ - <<<"${var:8}")"
+    optname="${var:8}"
+    optname="${optname//_/-}"
     echo -n "  --${optname} (current value: '${!var}' )"
     help_var="help_$var"
     var_exists "$help_var" && echo -e ":\n    ${!help_var}" || echo
@@ -285,13 +427,22 @@ function gbl_opt_help # ()
   exit
 }
 
+help_gbl_opt_load_config="Load additional configuration files. Can be repeated as much as needed."
+function gbl_opt_load_config # (file)
+{
+  debug_log "loading config file '$1'..."
+  [ ! -f "$1" ] && die 10 "load-config: cannot find config file '$1'"
+  . "$1"
+}
+
 # global option parsing core
 while (( $# > 0 )) && [ "${1:0:2}" = "--" ]
 do
   option="${1#--}"
   option_value="${option#*=}"
   [ -z "$(grep <<<"$option" = )" ] && option_value=true
-  option="$(tr - _ <<<"${option%%=*}")"
+  option="${option%%=*}"
+  option="${option//-/_}"
   [ "${option:0:3}" = "no_" ] &&
   {
     option_value=false
@@ -316,7 +467,7 @@ function run_command # (cmd, opts...?)
   (( $# == 0 )) && die 4 "no command provided..."
 
   # save the command verb and shift
-  command_verb="$1"
+  command_verb="${1//-/_}"
   shift
 
   debug_log 'command verb:' $command_verb
@@ -326,16 +477,13 @@ function run_command # (cmd, opts...?)
   then
     debug_log "searching for $command_verb in 'external' commands..."
     cmd_is_external=true
-    cmd_opt_path="$gbl_opt_prig_command_dir/cmd_opt_$command_verb"
-    cmd_script_path="$gbl_opt_prig_command_dir/cmd_$command_verb"
+    cmd_opt_path="$gbl_opt_prig_command_dir/cmd/cmd_opt_$command_verb"
+    cmd_script_path="$gbl_opt_prig_command_dir/cmd/cmd_$command_verb"
 
     if [ -e "$cmd_opt_path" ] && [ -e "$cmd_script_path" ]
     then
       debug_log "options for $command_verb have been located in $cmd_opt_path"
       debug_log "code for $command_verb have been located in $cmd_script_path"
-
-      # load options, the script is loaded after that
-      . "$cmd_opt_path"
     else
       die 5 "$command_verb: command verb does not exists. (has the folder been init / fixed / created with prig create or prig init or prig fix ?)"
     fi
@@ -349,7 +497,8 @@ function run_command # (cmd, opts...?)
     option="${1#--}"
     option_value="${option#*=}"
     [ -z "$(grep <<<"$option" = )" ] && option_value=true
-    option="$(tr - _ <<<"${option%%=*}")"
+    option="${option%%=*}"
+    option="${option//-/_}"
     [ "${option:0:3}" = "no_" ] &&
     {
       option_value=false
@@ -380,5 +529,8 @@ function run_command # (cmd, opts...?)
   # call the command verb this is the last thing the prig core does
   prig_cmd_"$command_verb" "$@"
 }
+
+# clear the log file
+echo >"$gbl_opt_log"
 
 run_command "$@"
