@@ -24,20 +24,22 @@
 
 function prig_cmd_apply # ()
 {
-  cmdcheck tr
-
   # create directories
   for directory in $conf_project_directory_layout
   do
-    mkdir -p "$directory"
+    log_cmd mkdir -p "$directory"
   done
 
   # remove empty extra directories
   dir_list="$(compgen -A directory)"
   for directory in $dir_list
   do
-    [[ "$conf_project_directory_layout" =~ (^|[[:space:]])"$directory"($|[[:space:]]) ]] || log_cmd rmdir "$directory"
+    [ "$directory" = ".git" ] && continue # ignore the git repository
+    [[ "$conf_project_directory_layout .git" =~ (^|[[:space:]])"$directory"($|[[:space:]]) ]] || log_cmd rmdir "$directory"
   done
 
-  
+  # TODO: install some submodules from somewhere, generate some files, do some stuff, ..., ...
+
+  # lastly, update prig (this would account a repo change, a change from local to a git repo, ...)
+  ( run_command update )
 }

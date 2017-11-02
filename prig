@@ -40,16 +40,20 @@ function debug_log # (message...)
 {
   (( $VERBOSE )) && echo ' DD ' ${command_verb:-[core]}: "$@"
 }
+gbl_opt_log="./prig.log"
 function log_cmd # (cmd, args...)
 {
   debug_log executing: "$@"
   {
     echo -e '\n------------------------------------------------------------------------------\n'"$@":'\n'
     "$@"
+    cmd_exit_code=$?
+    [ -z "$cmd_exit_code" ] && cmd_exit_code=512
+    echo -e '\n-- exited with code:' $cmd_exit_code
   } 1>>"$gbl_opt_log" 2>&1
+  (( $cmd_exit_code != 0 )) && debug_log '           '"$(printf "%${#1}s" | tr ' ' '^' )"' command exited with code' $cmd_exit_code
+  return $cmd_exit_code
 }
-
-
 
 ##
 ##  ENV CHECKS
@@ -78,6 +82,10 @@ cmdcheck cat
 cmdcheck cut
 cmdcheck grep
 cmdcheck git
+cmdcheck mkdir
+cmdcheck rmdir
+cmdcheck rm
+cmdcheck tr
 
 # check for alternatives (curl / wget, ...)
 has wget && has_wget=true || has_wget=false
@@ -93,6 +101,9 @@ debug_log "has wget: ${has_wget}, has curl: ${has_curl}"
 # global options definition
 gbl_opt_skip_unknown=false
 help_gbl_opt_skip_unknown="Do not generate an error when a flag is not recognized"
+
+gbl_opt_clear_logs=true
+help_gbl_opt_skip_unknown="Clear the log file when starting prig"
 
 gbl_opt_log="./prig.log"
 help_gbl_opt_log="The log file where output of commands are written"
@@ -121,8 +132,17 @@ noconf_cmd_opt_init_git_templatee=
 conf_project_name=
 help_conf_project_name="The project name"
 
-# load options for external commands
-[ -f ./.prigrc ] && { debug_log 'loading config file...' ; log_cmd . ./.prigrc ; }
+# load options for external commands. We need to load the config file at least once so that we have $gbl_opt_prig_command_dir set
+# then we will reload the configuration so that variables defined in that configuration will overwrite commands variables
+if [ -f ./.prigrc ]
+then
+  debug_log 'loading config file...' 
+  log_cmd . ./.prigrc
+elif [ -f ~/.prigrc ]
+then
+  debug_log 'loading global config file...' 
+  log_cmd . ~/.prigrc
+fi
 ext_command_options="$(compgen -A file "$gbl_opt_prig_command_dir/cmd/cmd_opt_")"
 for cmd_opt in $ext_command_options
 do
@@ -132,7 +152,15 @@ done
 
 
 # load the prig.conf file
-[ -f ./.prigrc ] && { debug_log 'loading config file...' ; log_cmd . ./.prigrc ; }
+if [ -f ./.prigrc ]
+then
+  debug_log 'loading config file...' 
+  log_cmd . ./.prigrc
+elif [ -f ~/.prigrc ]
+then
+  debug_log 'loading global config file...' 
+  log_cmd . ~/.prigrc
+fi
 
 
 
@@ -164,7 +192,8 @@ function prig_cmd_init # (project-name, project-directory='./')
   debug_log "project-name: '$conf_project_name'"
   debug_log "project-dir:  '$project_directory'"
 
-  pushd "$project_directory" 1>/dev/null
+  [ "$project_directory" != "." ] && log_cmd mkdir -p "$project_directory"
+  log_cmd pushd "$project_directory"
 
   # .prigrc generation
   if [ ! -f "./.prigrc" ] || [ "$cmd_opt_init_force" = "true" ]
@@ -246,7 +275,7 @@ EOF
     log_cmd git stash save -a 'pre-prig-init-'$(date +%s)
 
     # check if a prig submodule doesn't already exists
-    prig_repos="$(git submodule foreach 'echo -n "$path#" 1>&2 ; git remote get-url origin 1>&2' 2>&1 1>/dev/null  | grep "$gbl_opt_prig_repo")"
+    prig_repos="$(git submodule foreach 'echo -n "$path#" 1>&2 ; git remote get-url origin | tr \\n \\# 1>&2 ; echo -n "$name" 1>&2' 2>&1 1>/dev/null  | grep -F "$(echo -e "$gbl_opt_prig_repo\\nprig-submodule")")"
 
     if [ ! -z "$prig_repos" ]
     then
@@ -256,28 +285,39 @@ EOF
         path="$(cut -d'#' -f1 <<<"$repo")"
         echo "removing submodule in '$path'..."
 
-        log_cmd git rm --force "$path"
+        log_cmd git rm -r --force "$path"
       done <<<"$prig_repos"
       log_cmd git commit -am "[prig]: remove old prig submodules" &>/dev/null
     fi
   fi
 
-  echo "adding prig as a submodule in '$gbl_opt_prig_command_dir'..."
+  log_cmd git rm -r --force "$gbl_opt_prig_command_dir"
   log_cmd rm -rf "$gbl_opt_prig_command_dir"
   log_cmd rm -rf "$(git rev-parse --git-dir)/modules/prig-submodule/"
-  log_cmd git submodule add --name "prig-submodule" -- "$gbl_opt_prig_repo" "$gbl_opt_prig_command_dir"
+
+  # allow a local copy of prig, very useful for testing
+  if [ "${gbl_opt_prig_repo:0:7}" = 'file://' ]
+  then
+    echo "copying prig from '$gbl_opt_prig_repo' to '$gbl_opt_prig_command_dir'..."
+    log_cmd mkdir -p "$gbl_opt_prig_command_dir"
+    log_cmd cp -v "${gbl_opt_prig_repo:7}/prig" "$gbl_opt_prig_command_dir/"
+    log_cmd cp -Rv "${gbl_opt_prig_repo:7}/cmd" "$gbl_opt_prig_command_dir/"
+  else
+    echo "adding prig as a submodule in '$gbl_opt_prig_command_dir'..."
+    log_cmd git submodule add --name "prig-submodule" -- "$gbl_opt_prig_repo" "$gbl_opt_prig_command_dir"
+  fi
 
   # copy prig in the project root folder
   debug_log "checking for a 'prig' file..."
   [ -f "./prig" ] && cmp "./prig" "$gbl_opt_prig_command_dir/prig" &>/dev/null || log_cmd cp -v "$gbl_opt_prig_command_dir/prig" .
 
-  log_cmd git add .prigrc prig
+  log_cmd git add .prigrc prig "$gbl_opt_prig_command_dir"
   log_cmd git commit -am "[prig]: add prig" &>/dev/null
 
   echo "(re) generating the project with a './prig apply'..."
 
-  # give hand to the newly installed prig
-  exec ./prig apply
+  # give the execution to the newly installed prig
+  exec ./prig --no-clear-logs apply
 }
 
 # the help command
@@ -531,6 +571,6 @@ function run_command # (cmd, opts...?)
 }
 
 # clear the log file
-echo >"$gbl_opt_log"
+[ "$gbl_opt_clear_logs" = "true" ] && echo >"$gbl_opt_log"
 
 run_command "$@"
