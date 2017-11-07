@@ -1,0 +1,107 @@
+# Copyright (c) 2017 Timothée Feuillet
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# avoid running that twice
+[ "$in_prig_generator" = "1" ] || return
+
+export PATH="$prig_PATH"
+export in_prig_generator=0
+
+current_function="${0##*/}"
+generator_debug_name="${generator_file##*generators/}"
+generator_directory="$gbl_opt_prig_command_dir/../generators/$generator_name/"
+
+# load the generator api (run_generator, run_all_generators)
+function cmdcheck { :; }
+function var_exists # (var-name)
+{
+  typeset -p $1 &>/dev/null
+}
+function tee_cmd { "$@"; }
+. "$gbl_opt_prig_command_dir/cmd/generator_api"
+
+# some common functions:
+
+# utility functions:
+
+
+# check that a path is valid (that the path does not go below cwd)
+function is_path_valid #(path)
+{
+  rpath="$(realpath -m --relative-base="$(pwd)" -- "$1")"
+  [ "${rpath:0:1}" = '/' ] && return 1 # we have an absolute path here !
+
+  rpath="$(realpath -m --relative-base="$gbl_opt_prig_command_dir" -- "$1")"
+  [ "${rpath:0:1}" != '/' ] && return 2 # we have a path that accesses prig files !
+
+  rpath="$(realpath -m --relative-base="$gbl_opt_prig_command_dir/../generators" -- "$1")"
+  [ "${rpath:0:1}" != '/' ] && return 3 # we have a path that accesses generators files !
+
+  return 0
+}
+
+function is_path_inside #(path, base_directory)
+{
+  rpath="$(realpath -m --relative-base="$2" -- "$1")"
+  [ "${rpath:0:1}" = '/' ] && return 1
+  return 0
+}
+
+# check that a path is valid, if not, aborts execution
+function check_path #(path)
+{
+  is_path_valid "$1" || die "invalid path: '$1'"
+}
+
+function check_path_inside #(path, base_directory)
+{
+  is_path_inside "$1" "$2" || die "invalid path: '$1' should be inside '$2'"
+}
+
+# log functions
+
+function die #(message...)
+{
+  echo 1>&2 " !!  [$generator_debug_name]: $current_function: $@"
+  exit 1
+}
+function log #(message...)
+{
+  [ "$in_prig_template" = "0" ] && echo " --  [$generator_debug_name]: $@"
+  [ "$in_prig_template" = "1" ] && echo 1>&2 " --  [$generator_debug_name]: $@"
+}
+function debug_log #(message...)
+{
+  (( VERBOSE )) && [ "$in_prig_template" = "0" ] && echo " DD  [$generator_debug_name]: $current_function: $@"
+}
+function err #(message...)
+{
+  echo 1>&2 " **  [$generator_debug_name]: $@"
+}
+
+function log_cmd #(cmd, args...)
+{
+  (( VERBOSE >= 2 )) && debug_log "executing: $@"
+  "$@"
+}
+
+
+# some logging:
+(( VERBOSE >= 3 )) && [ "$in_prig_template" = "0" ] && debug_log "$@"

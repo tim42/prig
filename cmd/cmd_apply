@@ -22,6 +22,8 @@
 # Apply conf changes
 #
 
+
+
 function prig_cmd_apply # ()
 {
   # create directories
@@ -38,7 +40,27 @@ function prig_cmd_apply # ()
     [[ "$conf_project_directory_layout .git" =~ (^|[[:space:]])"$directory"($|[[:space:]]) ]] || log_cmd rmdir "$directory"
   done
 
-  # TODO: install some submodules from somewhere, generate some files, do some stuff, ..., ...
+  # install some submodules from somewhere
+  log_cmd mkdir -p "$gbl_opt_prig_command_dir/../generators"
+  for submodule in $conf_project_generator
+  do
+    submodule_name="${submodule%%:*}"
+    submodule_url="${submodule#*:}"
+
+    if [ "${submodule_url:0:7}" = 'file://' ]
+    then
+      log_cmd mkdir "$gbl_opt_prig_command_dir/../generators/$submodule_name"
+      log_cmd cp -Rv "${submodule_url:7}"/* "$gbl_opt_prig_command_dir/../generators/$submodule_name"
+    else
+      log_cmd git submodule add "$submodule_url" "$gbl_opt_prig_command_dir/../generators/$submodule_name"
+    fi
+  done
+
+  # run the generators
+  (
+    . "$gbl_opt_prig_command_dir/cmd/generator_api"
+    run_all_generators on_apply
+  )
 
   # lastly, update prig (this would account a repo change, a change from local to a git repo, ...)
   ( run_command update )

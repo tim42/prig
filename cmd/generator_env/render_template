@@ -1,0 +1,58 @@
+#!/bin/bash -p
+# Copyright (c) 2017 Timothée Feuillet
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# restore the prig env
+. "$prig_directory/$gbl_opt_prig_command_dir/cmd/generator_restore_env"
+
+(( $# == 0 )) && die "wrong number of args"
+
+template_file="$generator_directory/$1"
+shift
+
+# check that the output file is correct
+check_path_inside "$template_file" "$generator_directory"
+
+[ -f "$template_file" ] || die "template file '$template_file' does not exists"
+
+
+function unregex
+{
+   # This is a function because dealing with quotes is a pain.
+   # http://stackoverflow.com/a/2705678/120999
+   sed -e 's/[]\/()$*.^|[]/\\&/g' <<< "$1"
+}
+
+# get the prefix
+exp_prefix="%%"
+first_line="$(head -n1 "$template_file")"
+exp_prefix="$(unregex "$exp_prefix")"
+starts_at=1
+
+[ "${first_line:0:10}" = "# prefix: " ] && { exp_prefix="${first_line:10}" ; starts_at=2 ; }
+
+eof_marker="EOF_PRIG_X"
+while grep $eof_marker "$template_file" &>/dev/null
+do
+  eof_marker=${eof_marker}X
+done
+
+export in_prig_template=1
+run_generator "$generator_name" <(echo "eval cat<<$eof_marker"; tail -n+$starts_at "$template_file" | sed -e 's/[$\]/\\&/g' -e "s/$exp_prefix/$/g"; echo "$eof_marker") "$@"
