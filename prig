@@ -21,6 +21,8 @@
 # SOFTWARE.
 
 prig_file="$(pwd)/$0"
+launch_cwd="$(pwd)"
+prig_directory="$(pwd)"
 
 # print and die
 function die # (code, message...)
@@ -38,7 +40,7 @@ function diecv # (message...)
 
 function debug_log # (message...)
 {
-  (( $VERBOSE )) && echo ' DD ' ${command_verb:-[core]}: "$@"
+  (( VERBOSE )) && echo ' DD ' ${command_verb:-[core]}: "$@"
 }
 gbl_opt_log="./prig.log"
 function log_cmd # (cmd, args...)
@@ -51,6 +53,21 @@ function log_cmd # (cmd, args...)
     [ -z "$cmd_exit_code" ] && cmd_exit_code=512
     echo -e '\n-- exited with code:' $cmd_exit_code
   } 1>>"$gbl_opt_log" 2>&1
+  (( $cmd_exit_code != 0 )) && debug_log '           '"$(printf "%${#1}s" | tr ' ' '^' )"' command exited with code' $cmd_exit_code
+  return $cmd_exit_code
+}
+
+# tee-without-subshell/pipe/forking the command
+function tee_cmd # (cmd, args...)
+{
+  debug_log executing: "$@"
+
+  echo -e '\n------------------------------------------------------------------------------\n'"$@":'\n' 1>>"$gbl_opt_log" 2>&1
+  "$@" > >(tee -a "$gbl_opt_log") 2>&1
+  cmd_exit_code=$?
+  [ -z "$cmd_exit_code" ] && cmd_exit_code=512
+  echo -e '\n-- exited with code:' $cmd_exit_code 1>>"$gbl_opt_log" 2>&1
+
   (( $cmd_exit_code != 0 )) && debug_log '           '"$(printf "%${#1}s" | tr ' ' '^' )"' command exited with code' $cmd_exit_code
   return $cmd_exit_code
 }
@@ -80,11 +97,15 @@ cmdcheck compgen
 # check for required commands
 cmdcheck cat
 cmdcheck cut
-cmdcheck grep
 cmdcheck git
+cmdcheck grep
+cmdcheck head
 cmdcheck mkdir
-cmdcheck rmdir
+cmdcheck realpath
 cmdcheck rm
+cmdcheck rmdir
+cmdcheck sed
+cmdcheck tail
 cmdcheck tr
 
 # check for alternatives (curl / wget, ...)
@@ -194,6 +215,10 @@ function prig_cmd_init # (project-name, project-directory='./')
 
   [ "$project_directory" != "." ] && log_cmd mkdir -p "$project_directory"
   log_cmd pushd "$project_directory"
+
+  # as we pushd to the project directory, we change the prig_directory to the
+  # new current one
+  prig_directory="$(pwd)"
 
   # .prigrc generation
   if [ ! -f "./.prigrc" ] || [ "$cmd_opt_init_force" = "true" ]
