@@ -26,19 +26,19 @@
 
 function prig_cmd_apply # ()
 {
-  # create directories
-  for directory in $conf_project_directory_layout
-  do
-    log_cmd mkdir -p "$directory"
-  done
-
-  # remove empty extra directories
-  dir_list="$(compgen -A directory)"
-  for directory in $dir_list
-  do
-    [ "$directory" = ".git" ] && continue # ignore the git repository
-    [[ "$conf_project_directory_layout .git" =~ (^|[[:space:]])"$directory"($|[[:space:]]) ]] || log_cmd rmdir "$directory"
-  done
+#   # create directories
+#   for directory in $conf_project_directory_layout
+#   do
+#     log_cmd mkdir -p "$directory"
+#   done
+# 
+#   # remove empty extra directories
+#   dir_list="$(compgen -A directory)"
+#   for directory in $dir_list
+#   do
+#     [ "$directory" = ".git" ] && continue # ignore the git repository
+#     [[ "$conf_project_directory_layout .git" =~ (^|[[:space:]])"$directory"($|[[:space:]]) ]] || log_cmd rmdir "$directory"
+#   done
 
   # install some submodules from somewhere
   log_cmd mkdir -p "$gbl_opt_prig_command_dir/../generators"
