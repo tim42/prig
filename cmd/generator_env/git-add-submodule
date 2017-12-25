@@ -1,3 +1,4 @@
+#!/bin/bash -p
 # Copyright (c) 2017 Timothée Feuillet
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,22 +19,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-#
-# Apply conf changes
-#
+# restore the prig env
+. "$prig_directory/$gbl_opt_prig_command_dir/cmd/generator_restore_env"
 
+url="$1"
+path="$2"
+branch=master
+(( $# >= 3 )) && branch="$3"
 
+check_path "$path"
 
-function prig_cmd_apply # ()
-{
-  ( run_command check )
-
-  # run the generators
-  (
-    . "$gbl_opt_prig_command_dir/cmd/generator_api"
-    run_all_generators on_apply
-  )
-
-  # lastly, update prig (this would account a repo change, a change from local to a git repo, ...)
-  ( run_command update )
-}
+log_cmd git submodule add -b "$branch" --name "$path#$name" --force -- "$url" "$path"

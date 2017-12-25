@@ -42,6 +42,11 @@ function debug_log # (message...)
 {
   (( VERBOSE )) && echo ' DD ' ${command_verb:-[core]}: "$@"
 }
+function log # (message...)
+{
+  echo ' -- ' ${command_verb:-[core]}: "$@"
+}
+
 gbl_opt_log="./prig.log"
 function log_cmd # (cmd, args...)
 {
@@ -138,6 +143,9 @@ help_gbl_opt_prig_command_dir="Indicate the folder that hold the external prig c
 gbl_opt_prig_repo="https://github.com/tim42/prig.git"
 help_gbl_opt_prig_repo="The git repository of prig. Prig and its commands will be checked out from there."
 
+gbl_opt_prig_branch="master"
+help_gbl_opt_prig_branch="The branch of the git repository of prig."
+
 
 # command option definition
 cmd_opt_init_force=false
@@ -152,6 +160,9 @@ noconf_cmd_opt_init_git_templatee=
 # conf var definition (prefixed by conf_)
 conf_project_name=
 help_conf_project_name="The project name"
+
+conf_project_generator=""
+help_conf_project_generator="List of space-separated generator names (you will need to have a conf_generator_{name}_url and a conf_generator_{name}_branch variable) that will serve as project generators. (order is important)."
 
 # load options for external commands. We need to load the config file at least once so that we have $gbl_opt_prig_command_dir set
 # then we will reload the configuration so that variables defined in that configuration will overwrite commands variables
@@ -195,6 +206,75 @@ function var_exists # (var-name)
   typeset -p $1 &>/dev/null
 }
 
+function is_valid_submodule # (path, expected-url)
+{
+  [ ! -d "$1" ] && return 1
+
+  if [ "${1:0:7}" = 'file://' ]
+  then
+    repos="$(git submodule foreach 'echo -n "[$path#" 1>&2 ; git remote get-url origin | tr \\n ] 1>&2 ; echo 1>&2' 2>&1 1>/dev/null  | grep -F "[$2#$1]")"
+    [ ! -z "$repos" ] && return 1
+  else
+    repos="$(git submodule foreach 'echo -n "[$path#" 1>&2 ; git remote get-url origin | tr \\n ] 1>&2 ; echo 1>&2' 2>&1 1>/dev/null  | grep -F "[$2#$1]")"
+    [ -z "$repos" ] && return 1
+
+    [ "$(git -C "$1" remote get-url origin)" != "$2" ] && return 1
+  fi
+
+  return 0
+}
+
+
+function submodule_or_cp # (url, local_path [, branch])
+{
+  # check if the local path has the correct type
+  if [ -d "$2" ]
+  then
+    if ! is_valid_submodule "$2" "$1"
+    then
+      log "Wrong submodule, removing $2"
+      log_cmd git rm -r --force -- "$2"
+      log_cmd rm -rf -- "$2"
+      log_cmd rm -rf "$(git rev-parse --git-dir)/modules/$2/"
+    elif [ "${1:0:7}" != 'file://' ]
+    then
+      return
+    fi
+  fi
+
+  # perform the submodule or the cp operation
+  if [ "${1:0:7}" = 'file://' ]
+  then
+    log "copying $1 -> $2..."
+    log_cmd mkdir -p -- "$2"
+    log_cmd cp -Rv "${1:7}"/* "$2"
+  else
+    branch="${3:-master}"
+    log "adding submodule $1 ($branch) -> $2..."
+    log_cmd mkdir -p "$2"
+    log_cmd rmdir "$2"
+    log_cmd git submodule add -b "$branch" --name "$2#$3" --force -- "$1" "$2"
+  fi
+}
+
+function update_submodule # (url, local_path [, branch])
+{
+  [ ! -d "$2" ] && { submodule_or_cp "$@" ; return $? ; }
+  is_valid_submodule "$2" "$1" || { submodule_or_cp "$@" ; return $? ; }
+  if [ "${1:0:7}" = 'file://' ]
+  then
+    log_cmd git rm -r --force -- "$2"
+    log_cmd rm -rf "$2"
+    submodule_or_cp "$@"
+    return $?
+  fi
+
+  log "updating $2..."
+
+  log_cmd pushd "$2" || diecv "unable to change the directory to $2"
+  log_cmd git pull --rebase || diecv "unable to pull changes from the prig repository (check the logs)"
+  log_cmd popd
+}
 
 ##
 ##  PRIG BUILTIN COMMANDS
@@ -223,7 +303,7 @@ function prig_cmd_init # (project-name, project-directory='./')
   # .prigrc generation
   if [ ! -f "./.prigrc" ] || [ "$cmd_opt_init_force" = "true" ]
   then
-    echo "generating a '.prigrc' file..."
+    log "generating a '.prigrc' file..."
     log_cmd rm -f "./.prigrc"
 
     echo -n >"./.prigrc"
@@ -308,7 +388,7 @@ EOF
       while read -r repo
       do
         path="$(cut -d'#' -f1 <<<"$repo")"
-        echo "removing submodule in '$path'..."
+        log "removing submodule in '$path'..."
 
         log_cmd git rm -r --force "$path"
       done <<<"$prig_repos"
@@ -321,16 +401,7 @@ EOF
   log_cmd rm -rf "$(git rev-parse --git-dir)/modules/prig-submodule/"
 
   # allow a local copy of prig, very useful for testing
-  if [ "${gbl_opt_prig_repo:0:7}" = 'file://' ]
-  then
-    echo "copying prig from '$gbl_opt_prig_repo' to '$gbl_opt_prig_command_dir'..."
-    log_cmd mkdir -p "$gbl_opt_prig_command_dir"
-    log_cmd cp -v "${gbl_opt_prig_repo:7}/prig" "$gbl_opt_prig_command_dir/"
-    log_cmd cp -Rv "${gbl_opt_prig_repo:7}/cmd" "$gbl_opt_prig_command_dir/"
-  else
-    echo "adding prig as a submodule in '$gbl_opt_prig_command_dir'..."
-    log_cmd git submodule add --name "prig-submodule" -- "$gbl_opt_prig_repo" "$gbl_opt_prig_command_dir"
-  fi
+  submodule_or_cp "$gbl_opt_prig_repo" "$gbl_opt_prig_command_dir" "$gbl_opt_prig_branch"
 
   # copy prig in the project root folder
   debug_log "checking for a 'prig' file..."
@@ -339,7 +410,7 @@ EOF
   log_cmd git add .prigrc prig "$gbl_opt_prig_command_dir"
   log_cmd git commit -am "[prig]: add prig" &>/dev/null
 
-  echo "(re) generating the project with a './prig apply'..."
+  log "(re) generating the project with a './prig apply'..."
 
   # give the execution to the newly installed prig
   exec ./prig --no-clear-logs apply

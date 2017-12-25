@@ -37,20 +37,19 @@ function run_all_generators #(root_file, args...)
 {
   (
     # launch the generators
-    for submodule in $conf_project_generator
+    for submodule_name in $conf_project_generator
     do
-      submodule_name="${submodule%%:*}"
-      submodule_url="${submodule#*:}"
-
       [ ! -f "$gbl_opt_prig_command_dir/../generators/$submodule_name/$1" ] && continue
-      run_generator "$submodule_name" "$gbl_opt_prig_command_dir/../generators/$submodule_name/$@"
+      run_generator "$submodule_name" "$gbl_opt_prig_command_dir/../generators/$submodule_name.conf" "$gbl_opt_prig_command_dir/../generators/$submodule_name/$@"
     done
   )
 }
 
-function run_generator
+function run_generator #(submodule name, submodule conf file, command, args...)
 {
   submodule_name="$1"
+  shift
+  submodule_conf="$1"
   shift
 
   bash_full_path="$(which bash)"
@@ -84,6 +83,6 @@ function run_generator
     shift
 
     # Setup the env+PATH and launch the file in a restricted shell
-    tee_cmd env -i - "${env_vars[@]}" PATH="$gbl_opt_prig_command_dir/cmd/generator_env" "$bash_full_path" --restricted -- <(cat "$gbl_opt_prig_command_dir/cmd/generator_init"; cat "$cmd") "$@"
+    tee_cmd env -i - "${env_vars[@]}" PATH="$gbl_opt_prig_command_dir/cmd/generator_env" "$bash_full_path" --restricted -- <(cat "$gbl_opt_prig_command_dir/cmd/generator_init"; [ -f "$submodule_conf" ] && cat "$submodule_conf" ; cat "$cmd") "$@"
   )
 }

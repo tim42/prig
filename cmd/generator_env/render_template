@@ -55,4 +55,4 @@ do
 done
 
 export in_prig_template=1
-run_generator "$generator_name" <(echo "eval cat<<$eof_marker"; tail -n+$starts_at "$template_file" | sed -e 's/[$\]/\\&/g' -e "s/$exp_prefix/$/g"; echo "$eof_marker") "$@"
+run_generator "$generator_name" "" <(echo "eval cat<<$eof_marker"; tail -n+$starts_at "$template_file" | sed -e 's/[$\]/\\&/g' -e "s/$exp_prefix/$/g"; echo "$eof_marker") "$@"

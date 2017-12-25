@@ -19,21 +19,10 @@
 # SOFTWARE.
 
 #
-# Apply conf changes
+# Auto-updater for prig
 #
 
+help_prig_cmd_check="Check and repair prig installation. (this include installing and removing generators)"
+# usage_prig_cmd_check=""
 
 
-function prig_cmd_apply # ()
-{
-  ( run_command check )
-
-  # run the generators
-  (
-    . "$gbl_opt_prig_command_dir/cmd/generator_api"
-    run_all_generators on_apply
-  )
-
-  # lastly, update prig (this would account a repo change, a change from local to a git repo, ...)
-  ( run_command update )
-}

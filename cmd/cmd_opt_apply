@@ -25,12 +25,3 @@
 help_prig_cmd_apply="Apply changes in the config file (can also be used to regenerate/refresh the project)"
 # usage_prig_cmd_update=""
 
-
-# conf options
-#conf_project_directory_layout="$conf_project_name third_party tests samples tools scripts cmake"
-#help_conf_project_directory_layout="List of directories to create for the project."
-
-
-conf_project_generator=""
-help_conf_project_generator="List of space-separated name:repositories that will serve as project generators. (order is important)."
-
