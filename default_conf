@@ -1,0 +1,12 @@
+##
+## Default configuration for the github cloner
+##
+
+# where to checkout (if you use a generator like scaffold, it can be useful to have the same directory for both)
+conf_github_third_party=third_party
+
+# what projects (space separated, in the user/project-name format)
+conf_github_project_list="tim42/tools"
+
+
+conf_github_base_url="https://github.com/"
