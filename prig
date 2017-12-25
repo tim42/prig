@@ -553,7 +553,9 @@ function gbl_opt_help # ()
   help_fnc_list="$(compgen -A function 'gbl_opt_')"
   for fnc in $help_fnc_list
   do
-    echo -n "  --${fnc:8}"
+    optname="${fnc:8}"
+    optname="${optname//_/-}"
+    echo -n "  --${optname}"
     help_var="help_$fnc"
     var_exists "$help_var" && echo -e ":\n    ${!help_var}" || echo
     echo
