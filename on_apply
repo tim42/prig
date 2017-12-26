@@ -9,7 +9,6 @@ mkdir "${conf_github_third_party}"
 for user_project in $conf_github_project_list
 do
   project_dir="${user_project##*/}"
-  [ -e "${conf_github_third_party}/${project_dir}" ] && project_dir="${user_project//\//_}" # replace / with _
   [ -e "${conf_github_third_party}/${project_dir}" ] && echo "Cannot checkout ${user_project}: folder already exists" && continue
 
   echo Cloning $user_project
