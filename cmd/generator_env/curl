@@ -32,5 +32,5 @@ fi
 
 (( $# == 2 )) && check_path "$2" && log "curl: $2 <- $1"
 
-(( $# == 1 )) && curl --connect-timeout 5 -- "$1"
-(( $# == 2 )) && curl --connect-timeout 5 -- "$1" > "$2"
+(( $# == 1 )) && curl -sS --connect-timeout 5 -- "$1"
+(( $# == 2 )) && ( curl -# --connect-timeout 5 -- "$1" > "$2" ) 2>&1
