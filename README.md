@@ -1,8 +1,8 @@
 # PRIG
 
-**warning:**: prig is in an early stage of development. while it can be used to generate projects, it is absolutely not mature at all. Currently, only the generation work correctly, but the update, check, repair, ... should not be relied upon. At all.
+**warning:** prig is in an early stage of development. while it can be used to generate projects, it is absolutely not mature at all. Currently, only the generation work correctly, but the update, check, repair, ... should not be relied upon. At all.
 
-**warning:**: prig is a shell script. Generators are _not_ part of prig and despite them being run in restricted mode some flaws may still exists. The first goal of prig being **not** the security, please use with caution and always check what you are trying to execute. (this includes configuration files that have bootstrap code and prig itself). Configuration files and prig bootstrap code _does_ perform execution in a **non**-restricted shell code that comes directly from network. If this is not acceptable, you can still use a fully local installation of prig, but this will need some configuration on your part. If this is still not acceptable, prig is definitively not the project you are looking for.
+**warning:** prig is a shell script. Generators are _not_ part of prig and despite them being run in restricted mode some flaws may still exists. The first goal of prig being **not** the security, please use with caution and always check what you are trying to execute. (this includes configuration files that have bootstrap code and prig itself). Configuration files and prig bootstrap code _does_ perform execution in a **non**-restricted shell code that comes directly from network. If this is not acceptable, you can still use a fully local installation of prig, but this will need some configuration on your part. If this is still not acceptable, prig is definitively not the project you are looking for.
 
 ## prig in bullet points
 
@@ -18,6 +18,7 @@ Those disclaimers being done, here what prig is about:
 ## demo
 
 My personal configuration file can be found here: https://gist.github.com/tim42/810b1ed33fe57e1916d587ce9df7e9c8
+
 You can download it and execute it. (and if you haven't already read it, please read and understand the second warning).
 
 It can be executed with the following arguments in order to generate a _test_ project in a _test_ directory:
