@@ -594,7 +594,7 @@ do
 
   debug_log "gbl_opt_${option} => $option_value"
 
-  $option_is_var && declare gbl_opt_${option}="$option_value"
+  $option_is_var && declare -g gbl_opt_${option}="$option_value"
   $option_is_command && gbl_opt_${option} "$option_value"
 
   shift
@@ -650,7 +650,7 @@ function run_command # (cmd, opts...?)
 
     debug_log "cmd_opt_${command_verb}_${option} => $option_value"
 
-    $option_is_var && declare cmd_opt_${command_verb}_${option}="$option_value"
+    $option_is_var && declare -g cmd_opt_${command_verb}_${option}="$option_value"
     $option_is_command && cmd_opt_${command_verb}_${option} "$option_value"
 
     shift
