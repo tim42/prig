@@ -38,9 +38,9 @@ function prig_cmd_update # ()
   do
     submodule_url_var="conf_generator_${submodule_name}_url"
     submodule_url="${!submodule_url_var}"
-    submodule_branch_var="conf_generator_${submodule_name}_url"
+    submodule_branch_var="conf_generator_${submodule_name}_branch"
     submodule_branch=master
-    var_exists submodule_url_branch && [ ! -z "${!submodule_url_branch}" ] && submodule_branch="${!submodule_url_branch}"
+    var_exists "$submodule_branch_var" && [ ! -z "${!submodule_branch_var}" ] && submodule_branch="${!submodule_branch_var}"
 
     update_submodule "$submodule_url" "$generator_dir/$submodule_name" "$submodule_branch"
   done

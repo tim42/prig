@@ -21,3 +21,4 @@
 
 enable -n echo
 echo "$@"
+exit 0

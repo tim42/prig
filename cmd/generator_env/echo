@@ -26,3 +26,5 @@
 . "$prig_directory/$gbl_opt_prig_command_dir/cmd/generator_restore_env"
 
 log "$@"
+
+exit 0
