@@ -1,0 +1,15 @@
+
+conf_var_list="$(compgen -A variable "conf_grab_file_url_")"
+
+for var in $conf_var_list
+do
+  base_name="${var:19}"
+  pth_var="conf_grab_file_path_${base_name}"
+
+  url="${!var}"
+  pth="${!pth_var}"
+
+  # create parent directories + download the file
+  [ "${pth%/*}" != "$pth" ] && mkdir "${pth%/*}"
+  curl "$url" "$pth"
+done

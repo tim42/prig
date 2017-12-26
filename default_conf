@@ -1,0 +1,39 @@
+##
+## Grab a file from somewhere
+##
+
+# Grab conf is a bit weird:
+#   the conf_grab_file_url_ prefix is used to define the url of the file (where to fetch that file)
+#   the conf_grab_file_path_ prefix is used to set the local path of the file (in the project, relative to the project root)
+#
+# example:
+#   conf_grab_file_url_prig_core="https://raw.githubusercontent.com/tim42/prig/master/prig"
+#   conf_grab_file_path_prig_core="some/random/dir/prig"
+#
+# Please note that grabbed files will be overwritten each time you run prig generators
+#
+# In your configuration file, you should add the following function so that you can do --grab-file="http://toto.com/my-file.txt;src/myfile.txt"
+#
+# help_gbl_opt_grab_file="Add a file to be grabbed. Format is the following: url;local-path"
+# function gbl_opt_grab_file # (url:local-path)
+# {
+#   if [ "$1" = "true" ] || [ "$1" = "false" ]
+#   then
+#     return 1
+#   fi
+#
+#   pth="${1##*;}"
+#   url="${1%;*}"
+#
+#   # make sure the path is a safe var name
+#   safe_pth="$(base64 <<<"$pth")"
+#   safe_pth="${safe_pth//\//_1_}" # // -> _1_
+#   safe_pth="${safe_pth//+/_2_}" # + -> _2_
+#   safe_pth="${safe_pth//=/_3_}" # = -> _3_
+#
+#   declare -g "help_conf_grab_file_url_${safe_pth}=URL for $pth"
+#   declare -g "conf_grab_file_url_${safe_pth}=$url"
+#   declare -g "help_conf_grab_file_path_${safe_pth}=path for $pth"
+#   declare -g "conf_grab_file_path_${safe_pth}=$pth"
+# }
+
