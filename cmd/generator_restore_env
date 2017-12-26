@@ -48,6 +48,9 @@ function is_path_valid #(path)
   rpath="$(realpath -m --relative-base="$(pwd)" -- "$1")"
   [ "${rpath:0:1}" = '/' ] && return 1 # we have an absolute path here !
 
+  [ "${rpath}" = 'prig' ] && return 2 # we have a path that accesses prig files !
+  [ "${rpath}" = '.prigrc' ] && return 2 # we have a path that accesses prig files !
+
   rpath="$(realpath -m --relative-base="$gbl_opt_prig_command_dir" -- "$1")"
   [ "${rpath:0:1}" != '/' ] && return 2 # we have a path that accesses prig files !
 
