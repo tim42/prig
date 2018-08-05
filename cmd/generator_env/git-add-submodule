@@ -29,4 +29,6 @@ branch=master
 
 check_path "$path"
 
-log_cmd git submodule add -b "$branch" --name "$path#$name" --force -- "$url" "$path"
+path_hash=$(sha1sum <<<"$path" | cut -d' ' -f1)
+
+log_cmd git submodule add -b "$branch" --name "$path_hash#$name" --force -- "$url" "$path"

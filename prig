@@ -262,7 +262,8 @@ function submodule_or_cp # (url, local_path [, branch])
     log "adding submodule $1 ($branch) -> $2..."
     log_cmd mkdir -p "$2"
     log_cmd rmdir "$2"
-    log_cmd git submodule add -b "$branch" --name "$2#$3" --force -- "$1" "$2"
+    path_hash=$(sha1sum <<<"$2" | cut -d' ' -f1)
+    log_cmd git submodule add -b "$branch" --name "$path_hash#$3" --force -- "$1" "$2"
   fi
 }
 
